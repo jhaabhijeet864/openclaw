@@ -1,8 +1,10 @@
 // These consumers need the host-owned SQLite broker, which runs in forked processes.
 export const databaseWorkerCoreTestFiles = [
+  "packages/memory-host-sdk/src/host/session-memory-sync.test.ts",
   "src/snapshot/git-backup.test.ts",
   "src/state/backup-run-records.test.ts",
   "src/claws/provenance-runtime-read.async.test.ts",
+  "src/projects/project-registry.test.ts",
   "src/auto-reply/reply/commands-plugins.install.test.ts",
   "src/auto-reply/reply/commands-plugins.install-clawhub-spec.test.ts",
   "src/system-agent/setup-inference-credentials.lifecycle.test.ts",
@@ -59,6 +61,7 @@ export const databaseWorkerCoreTestFiles = [
   "src/agents/sessions/sdk.auth-migration.test.ts",
   "src/agents/subagents/completion/subagent-completion-admission.store.test.ts",
   "src/commands/doctor-maintenance.worker.test.ts",
+  "src/flows/doctor-health.dangling-workshop-index.test.ts",
   "src/entry.memory-json.test.ts",
   "src/gateway/server-methods/memory-search.test.ts",
   "src/logging/diagnostic-session-context.test.ts",
@@ -77,6 +80,7 @@ export const databaseWorkerCoreTestFiles = [
   "src/state/openclaw-state-db.test.ts",
   "src/state/openclaw-state-maintenance-resources.test.ts",
   "src/tasks/task-registry.test.ts",
+  "test/matrix-channel-read-authority.integration.test.ts",
   "test/plugins/beam-http-identity.test.ts",
   "src/plugin-sdk/runtime-doctor-migrations.test.ts",
   "src/plugin-state/plugin-state-store.doctor-repair.test.ts",

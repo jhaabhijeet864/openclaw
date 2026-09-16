@@ -133,18 +133,45 @@ describe("typed Goal operation persistence", () => {
       }),
     ).toEqual(receipt);
     const editedObjective = "\t resume the café migration 🦞\n/keep every byte ";
-    const edited = await mutateSessionGoal({
-      ...scope(),
-      expectedSessionId: sessionId,
-      operation: {
-        ...identity("edit-literal"),
-        action: "edit",
-        goalId: receipt!.goalId,
-        objective: editedObjective,
-      },
-    });
+    const editOperation = {
+      ...identity("edit-literal"),
+      action: "edit",
+      goalId: receipt!.goalId,
+      objective: editedObjective,
+    } satisfies SessionGoalOperation;
+    const editReads = trackSqliteStatementExecutions(
+      database().db,
+      ["sessionNodeSelects"],
+      (sql) =>
+        /^select\b/i.test(sql) && /\bfrom\s+"session_nodes"/i.test(sql)
+          ? "sessionNodeSelects"
+          : null,
+    );
+    let edited: Awaited<ReturnType<typeof mutateSessionGoal>>;
+    try {
+      edited = await mutateSessionGoal({
+        ...scope(),
+        expectedSessionId: sessionId,
+        operation: editOperation,
+      });
+      expect.soft(editReads.counts.sessionNodeSelects).toBeLessThanOrEqual(3);
+      expect.soft(editReads.rowCounts.sessionNodeSelects).toBeGreaterThan(0);
+      expect
+        .soft(editReads.textBytes.sessionNodeSelects)
+        .toBeLessThan(3.5 * Buffer.byteLength(skillsSnapshot.prompt));
+    } finally {
+      editReads.restore();
+    }
     expect(edited.result.goal?.objective).toBe(editedObjective);
+    expect(edited.sessionEntry?.skillsSnapshot).toEqual(skillsSnapshot);
     expect(loadSessionEntry(scope())?.goal?.objective).toBe(editedObjective);
+    expect(
+      lookupSessionGoalOperation({
+        ...scope(),
+        expectedSessionId: sessionId,
+        operation: editOperation,
+      }),
+    ).toEqual(edited.result);
   });
 
   it("replays the original success after clear and reopening without recreating Goal or turn", async () => {

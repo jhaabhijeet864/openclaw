@@ -4090,12 +4090,26 @@ describe("active-memory plugin", () => {
   });
 
   it("does not fast-fail memory_search results solely because debug hits is zero", async () => {
+    vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
     testing.setMinimumTimeoutMsForTests(1);
     testing.setSetupGraceTimeoutMsForTests(0);
     registerPluginConfig({ timeoutMs: 100, logging: true });
     const sessionKey = "agent:main:terminal-zero-hit-with-results";
     seedSession(sessionKey, "s-terminal-zero-hit-with-results", 0);
+    const transcriptWritten = createDeferred<void>();
+    const transcriptRead = createDeferred<void>();
+    const readFile = fs.readFile;
+    let transcriptPath: string | undefined;
+    vi.spyOn(fs, "readFile").mockImplementation(async (...args) => {
+      const content = await readFile(...args);
+      if (args[0] === transcriptPath) {
+        // Let the watcher consume this read before the model summary settles.
+        setImmediate(() => transcriptRead.resolve());
+      }
+      return content;
+    });
     runEmbeddedAgent.mockImplementationOnce(async (params: { sessionFile: string }) => {
+      transcriptPath = params.sessionFile;
       await writeTranscriptJsonl(params.sessionFile, [
         {
           message: {
@@ -4108,16 +4122,21 @@ describe("active-memory plugin", () => {
           },
         },
       ]);
+      transcriptWritten.resolve();
       await new Promise((resolve) => {
         setTimeout(resolve, 35);
       });
+      await transcriptRead.promise;
       return { payloads: [{ text: "User usually orders ramen." }] };
     });
 
-    const result = await runPromptBuild(
+    const resultPromise = runPromptBuild(
       { prompt: "what food do i usually order? zero hit with results" },
       { sessionKey },
     );
+    await transcriptWritten.promise;
+    await vi.advanceTimersByTimeAsync(35);
+    const result = await resultPromise;
 
     expect(requirePrependContext(result)).toContain("User usually orders ramen.");
     const lines = getActiveMemoryLines(sessionKey);

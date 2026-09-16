@@ -6,7 +6,6 @@ import { expect, vi, type Mock } from "vitest";
 import { waitForFile } from "../../test/helpers/process-wait.js";
 import { DEFAULT_VITEST_TEST_TIMEOUT_MS } from "../../test/vitest/vitest.timeouts.js";
 import { writeTriageUpdateFailure } from "../commands/triage-update.js";
-import { getFileLockProcessStartTime } from "../shared/pid-alive.js";
 import { openOpenClawStateDatabase } from "../state/openclaw-state-db.js";
 import { resolveOpenClawStateSqlitePath } from "../state/openclaw-state-db.paths.js";
 import { resolveTestNodeExecPath } from "../test-utils/node-process.js";
@@ -27,7 +26,11 @@ import {
   type ManagedServiceCommandTiming,
   type ManagedServiceManagerBoundaryResult,
 } from "./update-managed-service-handoff-lifecycle.test-support.js";
-import { createManagedServiceBoundaryCleanup } from "./update-managed-service-handoff-process.test-support.js";
+import {
+  createManagedServiceBoundaryCleanup,
+  createManagedServiceBoundaryParent,
+  pathExists,
+} from "./update-managed-service-handoff-process.test-support.js";
 import {
   managedRepairUpdaterScript,
   readManagedRepairEffects,
@@ -39,6 +42,7 @@ import {
 } from "./update-managed-service-handoff-runtime.test-support.js";
 import {
   managedServiceStateUpdateScript,
+  readManagedServiceHandoffLease,
   readRestartSentinelPayload,
 } from "./update-managed-service-handoff-state.test-support.js";
 import {
@@ -48,14 +52,7 @@ import {
 } from "./update-managed-service-native.test-support.js";
 import { createUpdateRun, getUpdateRun } from "./update-run-ledger.js";
 
-export async function pathExists(filePath: string): Promise<boolean> {
-  try {
-    await fs.access(filePath);
-    return true;
-  } catch {
-    return false;
-  }
-}
+export { pathExists };
 
 export function createManagedServiceManagerBoundary({
   spawnMock,
@@ -74,14 +71,8 @@ export function createManagedServiceManagerBoundary({
       await vi.importActual<typeof import("node:child_process")>("node:child_process");
     const { startManagedServiceUpdateHandoff } =
       await import("./update-managed-service-handoff.js");
-    const root = await fs.realpath(
-      await fs.mkdtemp(
-        path.join(
-          os.tmpdir(),
-          `openclaw-${kind}-manager-boundary-${options?.updaterOutput === "split-utf8" ? "安装-" : ""}`,
-        ),
-      ),
-    );
+    const prefix = `openclaw-${kind}-manager-boundary-${options?.updaterOutput === "split-utf8" ? "安装-" : ""}`;
+    const root = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), prefix)));
     tempDirs.add(root);
     const commandsPath = path.join(root, "manager-commands.log");
     const statePath = path.join(root, "manager-state.json");
@@ -133,18 +124,8 @@ export function createManagedServiceManagerBoundary({
       await fs.mkdir(invocationCwd);
       await fs.writeFile(path.join(invocationCwd, "update-input.txt"), "selected target");
     }
-    const parent = spawn(resolveTestNodeExecPath(), ["-e", "process.stdin.resume()"], {
-      stdio: ["pipe", "ignore", "ignore"],
-    });
-    const parentClosed = new Promise<void>((resolve) => {
-      parent.once("close", () => resolve());
-    });
-    const parentPid = parent.pid;
-    const parentStartIdentity = parentPid ? getFileLockProcessStartTime(parentPid) : null;
-    if (!parentPid || parentStartIdentity === null) {
-      parent.kill("SIGKILL");
-      throw new Error("expected the managed Gateway parent to have a stable process identity");
-    }
+    const { parent, parentClosed, parentPid, parentStartIdentity } =
+      createManagedServiceBoundaryParent(spawn);
     await fs.writeFile(
       path.join(root, kind === "systemd" ? "systemctl" : "launchctl"),
       createManagedServiceManagerFixtureScript({
@@ -155,9 +136,7 @@ export function createManagedServiceManagerBoundary({
         configPath: path.join(root, "openclaw.json"),
         options,
       }),
-      {
-        mode: 0o755,
-      },
+      { mode: 0o755 },
     );
     const env = {
       ...process.env,
@@ -215,8 +194,7 @@ export function createManagedServiceManagerBoundary({
         string[],
         { env: NodeJS.ProcessEnv },
       ];
-      const scriptPath = generatedArgs[0];
-      const generatedParamsPath = generatedArgs[1];
+      const [scriptPath, generatedParamsPath] = generatedArgs;
       if (!scriptPath || !generatedParamsPath) {
         throw new Error("expected generated managed handoff script and parameters");
       }
@@ -439,19 +417,7 @@ export function createManagedServiceManagerBoundary({
 
       const databasePath = String(generated.updateLeaseDatabasePath);
       const owner = String(generated.updateLeaseOwner);
-      const readLease = (): Record<string, unknown> | null => {
-        const db = new DatabaseSync(databasePath, { readOnly: true });
-        try {
-          const row = db
-            .prepare(
-              "SELECT payload_json FROM managed_update_handoffs WHERE install_root = ? AND owner = ?",
-            )
-            .get(root, owner) as { payload_json: string } | undefined;
-          return row ? (JSON.parse(row.payload_json) as Record<string, unknown>) : null;
-        } finally {
-          db.close();
-        }
-      };
+      const readLease = () => readManagedServiceHandoffLease(databasePath, root, owner);
       expect(readLease()).toEqual({
         version: 2,
         executor: { pid: runningHelper.pid, startIdentity: expect.any(String) },
@@ -483,7 +449,6 @@ export function createManagedServiceManagerBoundary({
           // the updater's validation signal permits revocation or activation below.
           await waitForFile(validationStartedPath, DEFAULT_VITEST_TEST_TIMEOUT_MS);
           await expect(pathExists(commandsPath)).resolves.toBe(false);
-          await expect(pathExists(validationStartedPath)).resolves.toBe(true);
           const validationClockAdvanceMs = options.validationClockAdvanceMs;
           if (validationClockAdvanceMs) {
             await vi.waitFor(async () => {
