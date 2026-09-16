@@ -382,7 +382,6 @@ const COMPACT_GROUP_SECONDS_HINTS = new Map<string, number>([
   ["agentic-control-plane-runtime", 19],
   ["agentic-control-plane-runtime-config", 20],
   ["agentic-control-plane-runtime-cron", 22],
-  ["agentic-control-plane-runtime-network", 1],
   ["agentic-control-plane-runtime-server", 23],
   ["agentic-control-plane-runtime-shared-token", 9],
   ["agentic-control-plane-runtime-state", 33],
@@ -583,7 +582,6 @@ const COMPACT_GITHUB_GROUP_SECONDS_HINTS = new Map<string, number>([
   ["agentic-control-plane-runtime", 31],
   ["agentic-control-plane-runtime-config", 31],
   ["agentic-control-plane-runtime-cron", 52],
-  ["agentic-control-plane-runtime-network", 2],
   ["agentic-control-plane-runtime-server", 54],
   ["agentic-control-plane-runtime-shared-token", 28],
   ["agentic-control-plane-runtime-state", 55],
@@ -1345,9 +1343,6 @@ function resolveGatewayServerShardName(file: string): string {
   if (name.includes("cron")) {
     return "agentic-control-plane-runtime-cron";
   }
-  if (name.includes("network")) {
-    return "agentic-control-plane-runtime-network";
-  }
   if (
     name.includes("plugin") ||
     name.includes("hooks") ||
@@ -1392,7 +1387,6 @@ function createGatewayServerSplitShards(): NodeTestSplitShard[] {
     "agentic-control-plane-runtime",
     "agentic-control-plane-runtime-config",
     "agentic-control-plane-runtime-cron",
-    "agentic-control-plane-runtime-network",
     "agentic-control-plane-runtime-server",
     "agentic-control-plane-runtime-shared-token",
     "agentic-control-plane-runtime-state",

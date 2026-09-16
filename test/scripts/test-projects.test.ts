@@ -3759,6 +3759,27 @@ describe("scripts/test-projects changed-target routing", () => {
     ]);
   });
 
+  it.each([
+    {
+      file: "src/cli/native-hook-relay-cli.locator-worker.test.ts",
+      config: "test/vitest/vitest.infra.config.ts",
+    },
+    {
+      file: "src/gateway/server-methods/native-hook-relay.test.ts",
+      config: "test/vitest/vitest.gateway-database-workers.config.ts",
+    },
+    {
+      file: "extensions/codex/src/app-server/run-attempt-one-shot-cleanup.test.ts",
+      config: "test/vitest/vitest.extension-database-workers.config.ts",
+    },
+    {
+      file: "extensions/codex/src/app-server/run-attempt.context-engine.test.ts",
+      config: "test/vitest/vitest.extension-database-workers.config.ts",
+    },
+  ])("routes native hook relay fixture $file to its host broker", ({ file, config }) => {
+    expectSingleVitestRunPlan(buildVitestRunPlans([file]), { config, includePatterns: [file] });
+  });
+
   it("routes explicit active-memory and Codex extension tests to their shards", () => {
     expect(
       buildVitestRunPlans([
@@ -3931,7 +3952,7 @@ describe("scripts/test-projects changed-target routing", () => {
   it.each([
     {
       directory: "extensions/matrix/src/matrix/client",
-      selected: "extensions/matrix/src/matrix/client/storage.test.ts",
+      selected: ["extensions/matrix/src/matrix/client/storage.test.ts"],
       inherited: [
         "extensions/matrix/src/matrix/client/storage.test.ts",
         "extensions/matrix/src/matrix/thread-bindings.test.ts",
@@ -3939,7 +3960,10 @@ describe("scripts/test-projects changed-target routing", () => {
     },
     {
       directory: "extensions/matrix/src/matrix/sdk",
-      selected: "extensions/matrix/src/matrix/sdk/idb-persistence.test.ts",
+      selected: [
+        "extensions/matrix/src/matrix/sdk/idb-persistence.test.ts",
+        "extensions/matrix/src/matrix/sdk/recovery-key-store.test.ts",
+      ],
       inherited: ["extensions/matrix/**/*.test.ts"],
     },
   ])(
@@ -3955,7 +3979,7 @@ describe("scripts/test-projects changed-target routing", () => {
         const worker = specs.find(
           (spec) => spec.config === "test/vitest/vitest.extension-database-workers.config.ts",
         );
-        expect(worker?.includePatterns).toEqual([selected]);
+        expect(worker?.includePatterns).toEqual(selected);
         expect(specs.flatMap((spec) => spec.includePatterns ?? [])).not.toContain(
           "extensions/matrix/src/matrix/thread-bindings.test.ts",
         );

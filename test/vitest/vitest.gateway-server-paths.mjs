@@ -20,6 +20,7 @@ export const gatewayDatabaseWorkerTestFiles = [
   "src/gateway/server-methods/models-list.freshness.integration.test.ts",
   "src/gateway/server-methods/models-list.membership.integration.test.ts",
   "src/gateway/server-methods/models-list.native-lifecycle.integration.test.ts",
+  "src/gateway/server-methods/native-hook-relay.test.ts",
   "src/gateway/server-methods/requester-cron-authority.integration.test.ts",
   "src/gateway/server-methods/server-methods.test.ts",
   "src/gateway/server-methods/sessions-list-persisted-worker.test.ts",
@@ -30,6 +31,7 @@ export const gatewayDatabaseWorkerTestFiles = [
   "src/gateway/session-swarm-summary.test.ts",
   "src/gateway/session-utils.subagent.test.ts",
   "src/gateway/setup-inference.first-signin.integration.test.ts",
+  "src/gateway/worker-environments/provider-crabbox-runtime-preflight.test.ts",
 ];
 
 // Canonical file ownership for the non-isolated Gateway server Vitest project.
